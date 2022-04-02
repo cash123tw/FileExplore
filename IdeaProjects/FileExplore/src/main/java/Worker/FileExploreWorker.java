@@ -3,23 +3,17 @@ package Worker;
 
 import Bean.FileDetail;
 import Bean.FileType;
-import lombok.Builder;
+import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.java.Log;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileAttributeView;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
+import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Log
@@ -29,6 +23,7 @@ public class FileExploreWorker {
     final private File file;
 
     @Setter
+    @Getter
     private boolean hideRealPath = true;
 
     /**
@@ -37,7 +32,6 @@ public class FileExploreWorker {
     public FileExploreWorker(String rootPath) throws FileNotFoundException {
         this(rootPath, false);
     }
-
 
     /**
      * @param rootPath     Basic path for search.
@@ -74,24 +68,22 @@ public class FileExploreWorker {
         return files;
     }
 
-    public String concatWithRootPath(String path) {
+    protected String concatWithRootPath(String path) throws IllegalAccessException {
+        checkFilePathIsOk(path);
+
         if (!path.contains(rootPath)) {
-            if (!path.startsWith("/")) {
-                path = "/".concat(path);
-            }
-            path = rootPath.concat(path);
+            path = Path.of(rootPath,path).toString();
         }
         return path;
     }
 
-    public String hideRealPath(String path) {
+    protected String hideRealPath(String path) {
         return path.replace(rootPath, "");
     }
 
-    private File getFile(String path) throws FileNotFoundException, IllegalAccessException {
+    protected File getFile(String path) throws FileNotFoundException, IllegalAccessException {
         String newPath =
                 concatWithRootPath(path);
-        checkFilePathIsOk(path);
 
         File file
                 = new File(newPath);
@@ -102,13 +94,13 @@ public class FileExploreWorker {
         return file;
     }
 
-    public void checkFilePathIsOk(String path) throws IllegalAccessException {
+    protected void checkFilePathIsOk(String path) throws IllegalAccessException {
         if (path.contains("..")) {
             throw new IllegalAccessException("Can't use .. command;");
         }
     }
 
-    public FileDetail makeFileDetail(File file) {
+    protected FileDetail makeFileDetail(File file) {
         return new FileDetail(
                 file.isFile() ? FileType.FILE : FileType.DIR,
                 file.getName(),
@@ -116,75 +108,75 @@ public class FileExploreWorker {
         );
     }
 
-    public List<FileDetail> searchFileByFileName(String fileName) throws Exception {
+    public List<FileDetail> SearchFile(String path, String fileName) throws IOException, IllegalAccessException {
 
-        overLoad = 0;
-        List<FileDetail> result
-                = searchFileByFileName0(fileName, new File(rootPath), new ArrayList<>());
-        System.out.printf("Search File Runtime Count : [%d]\n", overLoad);
+        return SearchFile(path,fileName,
+                (file) -> {
+                    String name
+                            = file.getName().toLowerCase();
 
-        return result;
+                    if (name.contains(fileName.toLowerCase())) {
+                        return true;
+                    }
+                    return false;
+                });
     }
 
-    private int overLoad;
-
-    private List<FileDetail> searchFileByFileName0(String fileName, File rootFile, List<FileDetail> result) throws Exception {
-        if (overLoad > 10000) {
-            throw new Exception("Over Load");
+    public List<FileDetail> SearchFile(String path,String fileName,Predicate<File> filter) throws IllegalAccessException, IOException {
+        if (Objects.isNull(path)
+                || path.trim().equals("")) {
+            path = rootPath;
+        } else {
+            path = concatWithRootPath(path);
         }
 
-        overLoad++;
-
-        File[] ar
-                = rootFile.listFiles();
-
-        if (ar != null) {
-            Arrays
-                    .stream(ar)
-                    .map(file -> {
-                        if (file.isDirectory()) {
-                            try {
-                                searchFileByFileName0(fileName, file, result);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                return null;
-                            }
-                        }
-                        return file;
-                    })
-                    .filter(file -> {
-                        if (!Objects.isNull(file) && file.getName().toLowerCase().contains(fileName.toLowerCase())) {
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    })
-                    .map(this::makeFileDetail)
-                    .forEach(result::add);
-        }
-        return result;
+        return SearchFile0(Paths.get(path),filter);
     }
 
-    private List<FileDetail> searchFileByFileNameNio0(String fileName, Path rootPath, List<FileDetail> result) {
+    public List<FileDetail> SearchFile0
+            (Path rootPath, Predicate<File> predicate) throws IOException {
+        if (!rootPath.toFile().exists()) {
+            throw new FileNotFoundException(
+                    String.format("File path [%s] is not exist.\n", rootPath)
+            );
+        }
 
-        Files.walkFileTree()
+        DefineBasicFileVisitor visitor
+                = new DefineBasicFileVisitor(predicate, this);
+        Files.walkFileTree(rootPath, visitor);
 
-        return result;
+        return visitor.getResult();
     }
 
     public class DefineBasicFileVisitor extends SimpleFileVisitor<Path> {
-        private String findName;
+        private Predicate<File> predicate;
+        @Getter
+        private List<FileDetail> result;
+        private FileExploreWorker worker;
+
+        public DefineBasicFileVisitor(Predicate<File> predicate, FileExploreWorker worker) {
+            this.predicate = predicate;
+            this.worker = worker;
+            result = new ArrayList<>();
+        }
 
         @Override
         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+
+            File file
+                    = dir.toFile();
+
             if (attrs.isDirectory()) {
-                String[] dirs = dir
-                        .toFile()
-                        .list();
+                String[] dirs
+                        = file.list();
 
                 if (dirs == null || dirs.length == 0) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
+            }
+
+            if (predicate.test(file)) {
+                addFile(dir);
             }
 
             return FileVisitResult.CONTINUE;
@@ -192,7 +184,13 @@ public class FileExploreWorker {
 
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            File file0
+                    = file.toFile();
 
+            if (predicate.test(file0)) {
+                addFile(file);
+            }
+            return FileVisitResult.CONTINUE;
         }
 
         @Override
@@ -200,6 +198,11 @@ public class FileExploreWorker {
             return FileVisitResult.SKIP_SUBTREE;
         }
 
+        private void addFile(Path path) {
+            FileDetail file
+                    = makeFileDetail(path.toFile());
+            result.add(file);
+        }
     }
 
 }
