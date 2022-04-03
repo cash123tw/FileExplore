@@ -2,115 +2,56 @@ package Worker;
 
 
 import Bean.FileDetail;
-import Bean.FileType;
+import Bean.PathProvider;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.java.Log;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Log
 public class FileExploreWorker {
 
-    final private String rootPath;
-    final private File file;
-
-    @Setter
     @Getter
-    private boolean hideRealPath = true;
+    private PathProvider pathProvider;
 
-    /**
-     * @param rootPath Basic Path for search.
-     */
-    public FileExploreWorker(String rootPath) throws FileNotFoundException {
-        this(rootPath, false);
+    public FileExploreWorker(PathProvider pathProvider) throws FileNotFoundException {
+        this.pathProvider = pathProvider;
+        log.info(String.format("File explore is build,root path is [%s]",pathProvider.getRootPath()));
     }
 
-    /**
-     * @param rootPath     Basic path for search.
-     * @param buildPathDir If file non exist,auto make a directory.
-     */
-    public FileExploreWorker(String rootPath, boolean buildPathDir) throws FileNotFoundException {
-        this.rootPath = rootPath;
-        this.file = new File(rootPath);
-
-        if (!buildPathDir && !this.file.exists()) {
-            throw new
-                    FileNotFoundException(String.format("This File Path Not Exist [path : %s]", rootPath));
-        } else {
-            this.file.mkdirs();
-        }
-
-        log.info(String.format("File explore is build,root path is [%s]", rootPath));
+    public FileExploreWorker(String rootPath) throws IllegalAccessException, FileNotFoundException {
+        this(new PathProvider(rootPath));
     }
 
     public List<FileDetail> getFileList(String path) throws IllegalAccessException, FileNotFoundException {
-        if (Objects.isNull(path) || path.trim().equals("")) {
-            path = "";
-        }
 
         File file
-                = getFile(path);
+                = pathProvider.getFile(path);
 
         List<FileDetail> files
                 = Arrays
                 .stream(file.listFiles())
-                .map(this::makeFileDetail)
+                .map(pathProvider::makeFileDetail)
                 .collect(Collectors.toList());
 
         return files;
     }
 
-    protected String concatWithRootPath(String path) throws IllegalAccessException {
-        checkFilePathIsOk(path);
-
-        if (!path.contains(rootPath)) {
-            path = Path.of(rootPath,path).toString();
-        }
-        return path;
-    }
-
-    protected String hideRealPath(String path) {
-        return path.replace(rootPath, "");
-    }
-
-    protected File getFile(String path) throws FileNotFoundException, IllegalAccessException {
-        String newPath =
-                concatWithRootPath(path);
-
-        File file
-                = new File(newPath);
-        if (!file.exists()) {
-            throw new FileNotFoundException("File is not exist");
-        }
-
-        return file;
-    }
-
-    protected void checkFilePathIsOk(String path) throws IllegalAccessException {
-        if (path.contains("..")) {
-            throw new IllegalAccessException("Can't use .. command;");
-        }
-    }
-
-    protected FileDetail makeFileDetail(File file) {
-        return new FileDetail(
-                file.isFile() ? FileType.FILE : FileType.DIR,
-                file.getName(),
-                hideRealPath ? hideRealPath(file.getPath()) : file.getPath()
-        );
-    }
-
     public List<FileDetail> SearchFile(String path, String fileName) throws IOException, IllegalAccessException {
 
-        return SearchFile(path,fileName,
+        return SearchFile(path,
                 (file) -> {
                     String name
                             = file.getName().toLowerCase();
@@ -122,15 +63,11 @@ public class FileExploreWorker {
                 });
     }
 
-    public List<FileDetail> SearchFile(String path,String fileName,Predicate<File> filter) throws IllegalAccessException, IOException {
-        if (Objects.isNull(path)
-                || path.trim().equals("")) {
-            path = rootPath;
-        } else {
-            path = concatWithRootPath(path);
-        }
+    public List<FileDetail> SearchFile(String path,Predicate<File> filter) throws IllegalAccessException, IOException {
+        File file
+                = pathProvider.getFile(path);
 
-        return SearchFile0(Paths.get(path),filter);
+        return SearchFile0(file.toPath(),filter);
     }
 
     public List<FileDetail> SearchFile0
@@ -200,7 +137,7 @@ public class FileExploreWorker {
 
         private void addFile(Path path) {
             FileDetail file
-                    = makeFileDetail(path.toFile());
+                    = pathProvider.makeFileDetail(path.toFile());
             result.add(file);
         }
     }
