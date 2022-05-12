@@ -1,6 +1,8 @@
 import Bean.PathProvider;
+import Worker.FileExploreWorker;
 import Worker.FileSaverWorker;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -9,18 +11,29 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.List;
+import java.util.function.Predicate;
 
 import static java.nio.file.StandardOpenOption.*;
 
 public class test {
     public static void main(String[] args) throws IOException, IllegalAccessException {
         long l1 = getTime();
-        PathProvider p = new PathProvider("D:/");
-        FileSaverWorker worker = new FileSaverWorker(p);
-
-        for (int i = 0; i < 20; i++) {
-            new Thread(new R1(worker)).start();
-        }
+        PathProvider p = new PathProvider("C:\\Mine\\Tomcat\\apache-tomcat-10.0.14-windows-x64\\apache-tomcat-10.0.14\\work\\Catalina");
+        FileExploreWorker f = new FileExploreWorker(p);
+        f.SearchFile("", new Predicate<File>() {
+            @Override
+            public boolean test(File file) {
+                System.out.println("xxxxx");
+                if(file.isDirectory()){
+                    Path p1 = Paths.get(file.getPath());
+                    Path p2 = Paths.get("C:\\Mine\\Tomcat\\apache-tomcat-10.0.14-windows-x64\\apache-tomcat-10.0.14\\work\\Catalina\\localhost");
+                    if(p1.startsWith(p2)){
+                        System.out.println();
+                    }
+                }
+                return true;
+            }
+        });
 
     }
 

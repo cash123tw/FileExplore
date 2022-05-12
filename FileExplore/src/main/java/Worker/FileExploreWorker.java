@@ -35,6 +35,14 @@ public class FileExploreWorker {
         this(new PathProvider(rootPath));
     }
 
+    public FileDetail getFile(String path) throws FileNotFoundException, IllegalAccessException {
+        File file
+                = pathProvider.getFile(path, false);
+        FileDetail fileDetail
+                = pathProvider.makeFileDetail(file,false);
+        return fileDetail;
+    }
+
     public List<FileDetail> getFileList(String path) throws IllegalAccessException, FileNotFoundException {
 
         File file
@@ -107,9 +115,9 @@ public class FileExploreWorker {
                 String[] dirs
                         = file.list();
 
-                if (dirs == null || dirs.length == 0) {
-                    return FileVisitResult.SKIP_SUBTREE;
-                }
+//                if (dirs == null || dirs.length == 0) {
+//                    return FileVisitResult.SKIP_SUBTREE;
+//                }
             }
 
             if (predicate.test(file)) {
