@@ -31,7 +31,7 @@ public class PathProvider {
         return path;
     }
 
-    protected String hideRealPath(String path) {
+    public String hideRealPath(String path) {
         return path.replace(rootPath, "");
     }
 

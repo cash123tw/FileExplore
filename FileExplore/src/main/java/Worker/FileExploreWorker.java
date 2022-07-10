@@ -28,7 +28,7 @@ public class FileExploreWorker {
 
     public FileExploreWorker(PathProvider pathProvider) throws FileNotFoundException {
         this.pathProvider = pathProvider;
-        log.info(String.format("File explore is build,root path is [%s]",pathProvider.getRootPath()));
+        log.info(String.format("File explore is build,root path is [%s]", pathProvider.getRootPath()));
     }
 
     public FileExploreWorker(String rootPath) throws IllegalAccessException, FileNotFoundException {
@@ -39,7 +39,7 @@ public class FileExploreWorker {
         File file
                 = pathProvider.getFile(path, false);
         FileDetail fileDetail
-                = pathProvider.makeFileDetail(file,false);
+                = pathProvider.makeFileDetail(file, false);
         return fileDetail;
     }
 
@@ -71,11 +71,11 @@ public class FileExploreWorker {
                 });
     }
 
-    public List<FileDetail> SearchFile(String path,Predicate<File> filter) throws IllegalAccessException, IOException {
+    public List<FileDetail> SearchFile(String path, Predicate<File> filter) throws IllegalAccessException, IOException {
         File file
                 = pathProvider.getFile(path);
 
-        return SearchFile0(file.toPath(),filter);
+        return SearchFile0(file.toPath(), filter);
     }
 
     public List<FileDetail> SearchFile0
@@ -114,17 +114,14 @@ public class FileExploreWorker {
             if (attrs.isDirectory()) {
                 String[] dirs
                         = file.list();
-
-//                if (dirs == null || dirs.length == 0) {
-//                    return FileVisitResult.SKIP_SUBTREE;
-//                }
             }
 
             if (predicate.test(file)) {
                 addFile(dir);
+                return FileVisitResult.CONTINUE;
+            } else {
+                return FileVisitResult.SKIP_SUBTREE;
             }
-
-            return FileVisitResult.CONTINUE;
         }
 
         @Override
