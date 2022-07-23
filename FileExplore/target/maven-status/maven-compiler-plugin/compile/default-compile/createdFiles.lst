@@ -1,4 +1,8 @@
+Bean\FileType.class
+Bean\FileDetail.class
 Bean\PathProvider.class
+Utils\TypeDetect.class
 Worker\FileSaverWorker.class
 Worker\FileExploreWorker$DefineBasicFileVisitor.class
 Worker\FileSaverWorker$SaveResult.class
+Worker\FileExploreWorker.class
